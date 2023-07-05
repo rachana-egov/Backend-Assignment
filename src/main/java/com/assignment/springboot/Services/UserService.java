@@ -1,49 +1,134 @@
 package com.assignment.springboot.Services;
 
+import com.assignment.springboot.model.Address;
 import com.assignment.springboot.model.User;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.PostConstruct;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Repository
 public class UserService {
     @Autowired
     JdbcTemplate jdbcTemplate;
+@Autowired
+    ObjectMapper objectMapper;
+
+    private static final String apiUrl = "https://random-data-api.com/api/v2/users?size=1";
 
     @PostConstruct
     public void createTableIfNotExists() {
         jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS my_data (" +
-                "id BIGINT PRIMARY KEY, " +
+                "id UUID, " +
                 "name VARCHAR(255), " +
                 "gender VARCHAR(10), " +
                 "mobileNumber VARCHAR(20), " +
-                "address VARCHAR(255))");
-    }
-    public void create(User user){
-        System.out.println(user);
-         jdbcTemplate.update("INSERT into my_data (id,name,gender,mobileNumber,address) VALUES(?,?,?,?,?)",
-                user.getId(),user.getName(),user.getGender(),user.getMobileNumber(),user.getAddress());
-//         System.out.println(user);
-    }
-    public void update(User user){
-        jdbcTemplate.update("update my_data set name=?,gender=?,mobileNumber=?,address=?where id=?",
-        user.getName(), user.getGender(),user.getMobileNumber(),user.getAddress(), user.getId());
-    }
-    public User Search(long id, String MobileNumber){
-        return jdbcTemplate.queryForObject("select * from my_data where id=? AND mobileNumber=?", new Object[]{id, MobileNumber},
-                new BeanPropertyRowMapper<User>(User.class));
+                "address JSON, " +
+                "createdTime BIGINT,"+
+                "active BOOLEAN, PRIMARY KEY (id, active)) PARTITION BY LIST (active);"
+
+        );
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS active_user PARTITION OF my_data FOR VALUES IN (TRUE);");
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS inactive_user PARTITION OF my_data FOR VALUES IN (FALSE);");
     }
 
-    public User findByMobileNumber(String mobileNumber){
-        return jdbcTemplate.queryForObject("select * from my_data where mobileNumber=?", new Object[]{mobileNumber},
-                new BeanPropertyRowMapper<User>(User.class));
+    public void create(List<User> users) {
+
+
+
+        for (User user : users) {
+            System.out.println(user);
+            if (isUniqueCombination(user.getName(), user.getMobileNumber())) {
+                String addressJson;
+                try {
+                    String jsonString = this.createUsersFromAPI();
+
+                    JsonNode rootNode =  objectMapper.readTree(jsonString);
+                    JsonNode addressNode = rootNode.get("address");
+                    Address address = objectMapper.treeToValue(addressNode, Address.class);
+                    user.setAddress(address);
+                    addressJson = objectMapper.writeValueAsString(user.getAddress());
+                    System.out.println(address);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException(e);
+                }
+                jdbcTemplate.update(
+
+                        "INSERT INTO my_data (id,name, gender, mobileNumber, address,createdTime,active) VALUES (?,?, ?, ?, ?::json,?,?)",
+                        user.getId(),user.getName(), user.getGender(), user.getMobileNumber(), addressJson, user.getCreatedTime(),user.isActive());
+
+            } else {
+                throw new IllegalArgumentException("User with the same name and mobile number already exists: " +
+                        "Name: " + user.getName() + ", Mobile Number: " + user.getMobileNumber());
+            }
+        }
     }
 
-    public void deleteById(long id){
+    private boolean isUniqueCombination(String name, String mobileNumber) {
+        int count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM my_data WHERE name = ? AND mobileNumber = ?", Integer.class, name, mobileNumber);
+        return count == 0;
+    }
+    public void update(List<User> users) {
+        List<Object[]> batchUser = new ArrayList<>();
+        for (User user : users) {
+            Object[] newUser = new Object[]{
+                    user.getName(),
+                    user.getGender(),
+                    user.getMobileNumber(),
+                    user.getAddress(),
+                    user.getId(),
+                    user.isActive()
+            };
+            batchUser.add(newUser);
+        }
+        jdbcTemplate.batchUpdate("UPDATE my_data SET name=?, gender=?, mobileNumber=?, address=?,active=? WHERE id=?",
+                batchUser);
+    }
+
+    public User Search(UUID id, String MobileNumber){
+        List<User> user= jdbcTemplate.query("select * from my_data where id=? AND mobileNumber=?", new UserRowMapper(), id, MobileNumber);
+
+        if(!user.isEmpty()){
+            return user.get(0);
+        }else{
+            return null;
+        }
+    }
+    public List<User> activeUsers(){
+        return  jdbcTemplate.query("SELECT * FROM active_user", new UserRowMapper());
+
+    }
+
+    public List<User> inActiveUsers(){
+        return  jdbcTemplate.query("SELECT * FROM inactive_user", new UserRowMapper());
+
+    }
+    public User findById(UUID id){
+        List<User> users = jdbcTemplate.query("select * from my_data where id=?", new UserRowMapper(),id);
+        if (!users.isEmpty()) {
+            return users.get(0); // Retrieve the first user from the list
+        }
+        return null;
+    }
+    public void deleteById(UUID id){
         jdbcTemplate.update("delete from my_data where id=?", new Object[]{id});
 
     }
+
+    public String createUsersFromAPI() {
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> response = restTemplate.getForEntity(apiUrl, String.class);
+        String responseBody = response.getBody();
+        return  responseBody;
+    }
 }
+

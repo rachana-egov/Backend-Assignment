@@ -36,15 +36,12 @@ public class UserController {
         }
     }
     @PostMapping("/user")
-    public ResponseEntity<String> createUsers(@RequestBody List<User> users) {
-        try {
-            userService.create(users);
+    public ResponseEntity<?> createUsers(@RequestBody List<User> users) {
+        List<String> errorMessages = userService.create(users);
+        if (errorMessages.isEmpty()) {
             return new ResponseEntity<>("Users were created successfully.", HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new ResponseEntity<>("An error occurred during user creation.", HttpStatus.INTERNAL_SERVER_ERROR);
+        } else {
+            return new ResponseEntity<>(errorMessages, HttpStatus.BAD_REQUEST);
         }
     }
     @PutMapping("/user")

@@ -41,12 +41,10 @@ public class UserService {
         jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS inactive_user PARTITION OF my_data FOR VALUES IN (FALSE);");
     }
 
-    public void create(List<User> users) {
-
-
-
+    public List<String> create(List<User> users) {
+        List<String> errorMessages = new ArrayList<>();
         for (User user : users) {
-            System.out.println(user);
+            //System.out.println(user);
             if (isUniqueCombination(user.getName(), user.getMobileNumber())) {
                 String addressJson;
                 try {
@@ -67,10 +65,12 @@ public class UserService {
                         user.getId(),user.getName(), user.getGender(), user.getMobileNumber(), addressJson, user.getCreatedTime(),user.isActive());
 
             } else {
-                throw new IllegalArgumentException("User with the same name and mobile number already exists: " +
-                        "Name: " + user.getName() + ", Mobile Number: " + user.getMobileNumber());
+                String errorMessage = String.format("User with the same name and mobile number already exists: Name: %s, Mobile Number: %s",
+                        user.getName(), user.getMobileNumber());
+                errorMessages.add(errorMessage);
             }
         }
+        return errorMessages;
     }
 
     private boolean isUniqueCombination(String name, String mobileNumber) {

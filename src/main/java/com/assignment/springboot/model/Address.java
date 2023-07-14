@@ -1,13 +1,13 @@
 package com.assignment.springboot.model;
 
 public class Address {
-    public String city;
-    public String street_name;
-    public String street_address;
-    public String zip_code;
-    public String state;
-    public String country;
-    public Coordinates coordinates;
+    private String city;
+    private String street_name;
+    private String street_address;
+    private String zip_code;
+    private String state;
+    private String country;
+    private Coordinates coordinates;
 
     public Address(String city, String street_name, String street_address, String zip_code, String state, String country, Coordinates coordinates) {
         this.city = city;
@@ -47,12 +47,12 @@ public class Address {
         this.street_address = street_address;
     }
 
-    public String getZipCode() {
+    public String getZip_code() {
         return zip_code;
     }
 
-    public void setZipCode(String zipCode) {
-        this.zip_code = zipCode;
+    public void setZip_code(String zip_code) {
+        this.zip_code = zip_code;
     }
 
     public String getState() {

@@ -1,7 +1,10 @@
 package com.assignment.springboot.controller;
 
 import com.assignment.springboot.Services.UserService;
+import com.assignment.springboot.messages.Producer;
 import com.assignment.springboot.model.User;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,12 +14,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-//@CrossOrigin(origins = "http://localhost:8080")
+
 @RestController
 @RequestMapping("/api")
 public class UserController {
     @Autowired
     UserService userService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private Producer producer;
 
     @GetMapping("/user/_search")
     public ResponseEntity<User>getUser(@RequestParam UUID id, @RequestParam String mobileNumber){
@@ -37,7 +45,14 @@ public class UserController {
     }
     @PostMapping("/user")
     public ResponseEntity<?> createUsers(@RequestBody List<User> users) {
-        List<String> errorMessages = userService.create(users);
+        List<String> errorMessages = new ArrayList<>();
+
+        try {
+            producer.UserCreationTopic(users);
+        } catch (JsonProcessingException e) {
+            errorMessages.add("Error processing users: " + e.getMessage());
+        }
+
         if (errorMessages.isEmpty()) {
             return new ResponseEntity<>("Users were created successfully.", HttpStatus.CREATED);
         } else {
@@ -47,34 +62,55 @@ public class UserController {
     @PutMapping("/user")
     public ResponseEntity<String> updateUser(@RequestBody List<User> users) {
         List<User> updateUsers = new ArrayList<>();
+        List<String> errorMessages = new ArrayList<>();
+
         for (User user : users) {
             User existingUser = userService.findById(user.getId());
+            System.out.println("Existing User: " + existingUser);
 
             if (existingUser != null) {
                 existingUser.setName(user.getName());
                 existingUser.setGender(user.getGender());
                 existingUser.setMobileNumber(user.getMobileNumber());
-                existingUser.setAddress(user.getAddress());
+                //existingUser.setAddress(user.getAddress());
                 existingUser.setActive(user.isActive());
 
                 updateUsers.add(existingUser);
+            } else {
+                String errorMessage = String.format("Cannot find User with ID: %s", user.getId());
+                errorMessages.add(errorMessage);
             }
         }
+
         if (!updateUsers.isEmpty()) {
-            userService.update(updateUsers);
-            return new ResponseEntity<>("Users were updated successfully.", HttpStatus.OK);
+            try {
+                producer.UserUpdateTopic(updateUsers);
+                return new ResponseEntity<>("User update request sent successfully.", HttpStatus.OK);
+            } catch (JsonProcessingException e) {
+                errorMessages.add("Error processing user update request: " + e.getMessage());
+            }
+        }
+
+        if (!errorMessages.isEmpty()) {
+            return new ResponseEntity<>(errorMessages.toString(), HttpStatus.BAD_REQUEST);
         } else {
             return new ResponseEntity<>("Cannot find Users with provided IDs.", HttpStatus.NOT_FOUND);
         }
-
     }
     @DeleteMapping("/user/{id}")
-    public ResponseEntity<String> deleteUser(@PathVariable("id") UUID id) {
-        try {
-            userService.deleteById(id);
-            return new ResponseEntity<>("User was deleted successfully.", HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Cannot delete User.", HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<String> deleteUser(@PathVariable("id") UUID userId) {
+        User existingUser = userService.findById(userId);
+
+        if (existingUser != null) {
+            try {
+                producer.UserDeleteTopic(userId);
+
+                return new ResponseEntity<>("Delete request sent successfully.", HttpStatus.OK);
+            } catch (JsonProcessingException e) {
+                return new ResponseEntity<>("Error processing delete request.", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } else {
+            return new ResponseEntity<>("Cannot find User with the provided ID.", HttpStatus.NOT_FOUND);
         }
     }
 }

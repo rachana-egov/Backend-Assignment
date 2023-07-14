@@ -1,8 +1,8 @@
 package com.assignment.springboot.model;
 
 public class UserSearchCriteria{
-    public long id;
-    public String mobileNumber;
+    private long id;
+    private String mobileNumber;
     public UserSearchCriteria(){
 
     }

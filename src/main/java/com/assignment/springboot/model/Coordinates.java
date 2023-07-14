@@ -1,18 +1,18 @@
 package com.assignment.springboot.model;
 
 public class Coordinates {
-    public Coordinates(String lat, String lng) {
-        this.lat = lat;
-        this.lng = lng;
-    }
 
-    public String lat;
-    public String lng;
+
+    private String lat;
+    private String lng;
 
     public Coordinates() {
 
     }
-
+    public Coordinates(String lat, String lng) {
+        this.lat = lat;
+        this.lng = lng;
+    }
     public String getLat() {
         return lat;
     }

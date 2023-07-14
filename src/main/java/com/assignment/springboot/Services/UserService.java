@@ -20,7 +20,7 @@ import java.util.UUID;
 public class UserService {
     @Autowired
     JdbcTemplate jdbcTemplate;
-@Autowired
+    @Autowired
     ObjectMapper objectMapper;
 
     private static final String apiUrl = "https://random-data-api.com/api/v2/users?size=1";
@@ -55,7 +55,7 @@ public class UserService {
                     Address address = objectMapper.treeToValue(addressNode, Address.class);
                     user.setAddress(address);
                     addressJson = objectMapper.writeValueAsString(user.getAddress());
-                    System.out.println(address);
+                    //System.out.println(addressNode);
                 } catch (JsonProcessingException e) {
                     throw new RuntimeException(e);
                 }
@@ -84,18 +84,17 @@ public class UserService {
                     user.getName(),
                     user.getGender(),
                     user.getMobileNumber(),
-                    user.getAddress(),
-                    user.getId(),
-                    user.isActive()
+                    user.isActive(),
+                    user.getId()
             };
             batchUser.add(newUser);
         }
-        jdbcTemplate.batchUpdate("UPDATE my_data SET name=?, gender=?, mobileNumber=?, address=?,active=? WHERE id=?",
+        jdbcTemplate.batchUpdate("UPDATE my_data SET name=?, gender=?, mobileNumber=?,active=? WHERE id::uuid=?",
                 batchUser);
     }
 
     public User Search(UUID id, String MobileNumber){
-        List<User> user= jdbcTemplate.query("select * from my_data where id=? AND mobileNumber=?", new UserRowMapper(), id, MobileNumber);
+        List<User> user= jdbcTemplate.query("select * from my_data WHERE id::uuid=? AND mobileNumber=?", new UserRowMapper(), id, MobileNumber);
 
         if(!user.isEmpty()){
             return user.get(0);
@@ -113,14 +112,14 @@ public class UserService {
 
     }
     public User findById(UUID id){
-        List<User> users = jdbcTemplate.query("select * from my_data where id=?", new UserRowMapper(),id);
+        List<User> users = jdbcTemplate.query("select * from my_data WHERE id::uuid=?", new UserRowMapper(),id);
         if (!users.isEmpty()) {
             return users.get(0); // Retrieve the first user from the list
         }
         return null;
     }
     public void deleteById(UUID id){
-        jdbcTemplate.update("delete from my_data where id=?", new Object[]{id});
+        jdbcTemplate.update("delete from my_data WHERE id::uuid=?", new Object[]{id});
 
     }
 

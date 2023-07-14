@@ -7,13 +7,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 public class User {
-    public UUID id;
-    public String name;
-    public String gender;
-    public String mobileNumber;
-    public Address address;
-    public long createdTime;
-    public boolean active;
+    private UUID id;
+    private String name;
+    private String gender;
+    private String mobileNumber;
+    private Address address;
+    private long createdTime;
+    private boolean active;
     public User(){
         this.id = UUID.randomUUID();
         this.createdTime = Instant.now().toEpochMilli();

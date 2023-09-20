@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public class User {
-    private UUID id;
+    private String id;
     private String name;
     private String gender;
     private String mobileNumber;
@@ -15,12 +15,11 @@ public class User {
     private long createdTime;
     private boolean active;
     public User(){
-        this.id = UUID.randomUUID();
         this.createdTime = Instant.now().toEpochMilli();
     }
 
-    public User(UUID id, String name, String gender, String mobileNumber, Address address, long createdTime, boolean active) {
-        this.id = UUID.randomUUID();
+    public User(String id, String name, String gender, String mobileNumber, Address address, long createdTime, boolean active) {
+        this.id = id;
         this.name = name;
         this.gender = gender;
         this.mobileNumber = mobileNumber;
@@ -29,11 +28,11 @@ public class User {
         this.active = active;
     }
 
-    public UUID getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(UUID id) {
+    public void setId(String id) {
         this.id = id;
     }
 

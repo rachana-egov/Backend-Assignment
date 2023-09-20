@@ -27,7 +27,7 @@ public class UserController {
     private Producer producer;
 
     @GetMapping("/user/_search")
-    public ResponseEntity<User>getUser(@RequestParam UUID id, @RequestParam String mobileNumber){
+    public ResponseEntity<User>getUser(@RequestParam String id, @RequestParam String mobileNumber){
         User foundUser = userService.Search(id, mobileNumber);
         if(foundUser!=null){
             return ResponseEntity.ok(foundUser);
@@ -98,7 +98,7 @@ public class UserController {
         }
     }
     @DeleteMapping("/user/{id}")
-    public ResponseEntity<String> deleteUser(@PathVariable("id") UUID userId) {
+    public ResponseEntity<String> deleteUser(@PathVariable("id") String userId) {
         User existingUser = userService.findById(userId);
 
         if (existingUser != null) {

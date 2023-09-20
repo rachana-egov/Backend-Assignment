@@ -6,6 +6,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -22,13 +26,13 @@ public class UserService {
     JdbcTemplate jdbcTemplate;
     @Autowired
     ObjectMapper objectMapper;
-
-    private static final String apiUrl = "https://random-data-api.com/api/v2/users?size=1";
+    @Autowired
+    private Environment environment;
 
     @PostConstruct
     public void createTableIfNotExists() {
         jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS my_data (" +
-                "id UUID, " +
+                "id VARCHAR(255), " +
                 "name VARCHAR(255), " +
                 "gender VARCHAR(10), " +
                 "mobileNumber VARCHAR(20), " +
@@ -46,6 +50,12 @@ public class UserService {
         for (User user : users) {
             //System.out.println(user);
             if (isUniqueCombination(user.getName(), user.getMobileNumber())) {
+                String generatedId = generateIdFromIdGenApi();
+                if (generatedId != null) {
+                    user.setId(generatedId);
+                } else {
+                    errorMessages.add("Failed to generate ID from the API.");
+                }
                 String addressJson;
                 try {
                     String jsonString = this.createUsersFromAPI();
@@ -89,12 +99,12 @@ public class UserService {
             };
             batchUser.add(newUser);
         }
-        jdbcTemplate.batchUpdate("UPDATE my_data SET name=?, gender=?, mobileNumber=?,active=? WHERE id::uuid=?",
+        jdbcTemplate.batchUpdate("UPDATE my_data SET name=?, gender=?, mobileNumber=?,active=? WHERE id=?",
                 batchUser);
     }
 
-    public User Search(UUID id, String MobileNumber){
-        List<User> user= jdbcTemplate.query("select * from my_data WHERE id::uuid=? AND mobileNumber=?", new UserRowMapper(), id, MobileNumber);
+    public User Search(String id, String MobileNumber){
+        List<User> user= jdbcTemplate.query("select * from my_data WHERE id=? AND mobileNumber=?", new UserRowMapper(), id, MobileNumber);
 
         if(!user.isEmpty()){
             return user.get(0);
@@ -111,23 +121,65 @@ public class UserService {
         return  jdbcTemplate.query("SELECT * FROM inactive_user", new UserRowMapper());
 
     }
-    public User findById(UUID id){
-        List<User> users = jdbcTemplate.query("select * from my_data WHERE id::uuid=?", new UserRowMapper(),id);
+    public User findById(String id){
+        List<User> users = jdbcTemplate.query("select * from my_data WHERE id=?", new UserRowMapper(),id);
         if (!users.isEmpty()) {
             return users.get(0); // Retrieve the first user from the list
         }
         return null;
     }
-    public void deleteById(UUID id){
-        jdbcTemplate.update("delete from my_data WHERE id::uuid=?", new Object[]{id});
+    public void deleteById(String id){
+        jdbcTemplate.update("delete from my_data WHERE id=?", new Object[]{id});
 
     }
 
     public String createUsersFromAPI() {
+        String apiUrl = environment.getProperty("api.url");
         RestTemplate restTemplate = new RestTemplate();
         ResponseEntity<String> response = restTemplate.getForEntity(apiUrl, String.class);
         String responseBody = response.getBody();
         return  responseBody;
     }
+
+    public String generateIdFromIdGenApi() {
+        try {
+            String idGenUrl = "http://localhost:8088/egov-idgen/id/_generate"; // The API endpoint URL
+
+            // Create the request body as per the API specification
+            String requestBody = "{\"RequestInfo\": {}, \"idRequests\": [{\"tenantId\": \"pb\",\"idName\": \"my.user-service.receipt.id\"}] }";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
+
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<String> response = restTemplate.postForEntity(idGenUrl, requestEntity, String.class);
+            String responseBody = response.getBody();
+
+            // Parse the response to get the ID field
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(responseBody);
+            JsonNode idResponsesArray = rootNode.get("idResponses");
+            if (idResponsesArray != null && idResponsesArray.isArray() && idResponsesArray.size() > 0) {
+                JsonNode firstIdResponse = idResponsesArray.get(0);
+                JsonNode idNode = firstIdResponse.get("id");
+                if (idNode != null && idNode.isTextual()) {
+                    String generatedId = idNode.asText();
+                    //System.out.println("Generated ID: " + generatedId);
+                    return generatedId;
+                }
+            }
+
+            // Return null if the ID is not found in the response or the response is empty
+            System.out.println("Failed to generate ID from the API.");
+            return null;
+        } catch (Exception e) {
+            // Handle any exceptions or errors that might occur during the request
+            e.printStackTrace();
+            return null;
+        }
+    }
+
 }
 

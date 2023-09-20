@@ -53,7 +53,7 @@ public class Consumer {
     @KafkaListener(topics="user-deleted")
     public void consumeUserDeleteRequest(String userId){
         try {
-            UUID id = UUID.fromString(userId);
+            String id = userId;
             User existingUser = userService.findById(id);
 
             if (existingUser != null) {

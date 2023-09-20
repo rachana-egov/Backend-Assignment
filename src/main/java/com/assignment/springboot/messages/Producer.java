@@ -24,9 +24,8 @@ public class Producer {
         kafkaTemplate.send("user-updated", userJson);
     }
 
-    public void UserDeleteTopic(UUID userId) throws JsonProcessingException {
-        String userIdString = userId.toString();
-        kafkaTemplate.send("user-deleted", userIdString);
+    public void UserDeleteTopic(String userId) throws JsonProcessingException {
+        kafkaTemplate.send("user-deleted", userId);
         System.out.println("User delete request sent successfully.");
     }
 
